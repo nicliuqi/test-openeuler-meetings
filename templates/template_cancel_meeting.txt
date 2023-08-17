@@ -1,0 +1,1 @@
+Sorry! The {{platform}} meeting will be held at {{start_time}} scheduled by openEuler {{sig_name}} SIG has been cancelled.
