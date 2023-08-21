@@ -182,6 +182,7 @@ class LoginSerializer(serializers.ModelSerializer):
         data['level'] = instance.level
         data['gitee_name'] = instance.gitee_name
         data['activity_level'] = instance.activity_level
+        data['agree_privacy_policy'] = instance.agree_privacy_policy
         return data
 
 

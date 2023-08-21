@@ -27,6 +27,8 @@ class User(AbstractBaseUser):
     activity_level = models.SmallIntegerField(verbose_name='活动权限', choices=((1, '普通'), (2, '活动发起人'), (3, '管理员')),
                                               default=1)
     register_number = models.IntegerField(verbose_name='报名次数', default=0)
+    agree_privacy_policy = models.BooleanField(verbose_name='同意隐私政策', default=False)
+    agree_privacy_policy_time = models.DateTimeField(verbose_name='同意隐私政策时间', null=True, blank=True)
 
     USERNAME_FIELD = 'openid'
 
@@ -67,6 +69,7 @@ class Meeting(models.Model):
     emaillist = models.TextField(verbose_name='邮件列表', null=True, blank=True)
     host_id = models.EmailField(verbose_name='host_id', null=True, blank=True)
     mid = models.CharField(verbose_name='会议id', max_length=20)
+    mmid = models.CharField(verbose_name='腾讯会议id', max_length=20, null=True, blank=True)
     timezone = models.CharField(verbose_name='时区', max_length=50, null=True, blank=True)
     password = models.CharField(verbose_name='密码', max_length=128, null=True, blank=True)
     start_url = models.TextField(verbose_name='开启会议url', null=True, blank=True)
@@ -134,6 +137,7 @@ class Activity(models.Model):
     sign_url = models.CharField(verbose_name='签到二维码', max_length=255, null=True, blank=True)
     mid = models.CharField(verbose_name='网络研讨会id', max_length=20, null=True, blank=True)
     replay_url = models.CharField(verbose_name='回放地址', max_length=255, null=True, blank=True)
+    register_url = models.CharField(verbose_name='报名链接', max_length=255, null=True, blank=True)
 
 
 class Feedback(models.Model):

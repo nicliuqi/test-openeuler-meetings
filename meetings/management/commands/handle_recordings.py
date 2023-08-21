@@ -152,7 +152,7 @@ def download_upload_recordings(start, end, zoom_download_url, mid, total_size, v
             topic = video.topic
             agenda = video.agenda
             community = video.community
-            bucketName = os.getenv('OBS_BUCKETNAME', '')
+            bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME', '')
             if not bucketName:
                 logger.error('mid: {}, bucketName required'.format(mid))
                 return
@@ -256,10 +256,10 @@ def handle_zoom_recordings(mid):
             logger.info('meeting {}: 文件过小，不予操作'.format(mid))
         else:
             # 连接obs服务，实例化ObsClient
-            access_key_id = os.getenv('ACCESS_KEY_ID', '')
-            secret_access_key = os.getenv('SECRET_ACCESS_KEY', '')
-            endpoint = os.getenv('OBS_ENDPOINT', '')
-            bucketName = os.getenv('OBS_BUCKETNAME', '')
+            access_key_id = settings.DEFAULT_CONF.get('ACCESS_KEY_ID', '')
+            secret_access_key = settings.DEFAULT_CONF.get('SECRET_ACCESS_KEY', '')
+            endpoint = settings.DEFAULT_CONF.get('OBS_ENDPOINT', '')
+            bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME', '')
             if not (access_key_id and secret_access_key and endpoint and bucketName):
                 logger.error('losing required arguments for ObsClient')
                 return
@@ -370,7 +370,7 @@ def download_upload_welink_recordings(start, end, mid, filename, object_key, end
         topic = (video.topic + '-{}'.format(order_number))
     agenda = video.agenda
     community = video.community
-    bucketName = os.getenv('OBS_BUCKETNAME', '')
+    bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME', '')
     if not bucketName:
         logger.error('mid: {}, bucketName required'.format(mid))
         return
@@ -443,10 +443,10 @@ def after_download_recording(target_filename, start, end, mid, target_name):
     if os.path.exists(target_filename):
         total_size = os.path.getsize(target_filename)
         # 连接obs服务，实例化ObsClient
-        access_key_id = os.getenv('ACCESS_KEY_ID', '')
-        secret_access_key = os.getenv('SECRET_ACCESS_KEY', '')
-        endpoint = os.getenv('OBS_ENDPOINT', '')
-        bucketName = os.getenv('OBS_BUCKETNAME', '')
+        access_key_id = settings.DEFAULT_CONF.get('ACCESS_KEY_ID', '')
+        secret_access_key = settings.DEFAULT_CONF.get('SECRET_ACCESS_KEY', '')
+        endpoint = settings.DEFAULT_CONF.get('OBS_ENDPOINT', '')
+        bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME', '')
         if not (access_key_id and secret_access_key and endpoint and bucketName):
             logger.error('losing required arguments for ObsClient')
             return
@@ -537,6 +537,10 @@ def handle_welink_recordings(mid):
             after_download_recording(target_filename, start, end, mid, target_name)
 
 
+def handle_tencent_recordings(mid):
+    pass
+
+
 def run(mid):
     """
     查询Video根据total_size判断是否需要执行后续操作（下载、上传、保存数据）
@@ -549,4 +553,5 @@ def run(mid):
         handle_zoom_recordings(mid)
     elif platform == 'welink':
         handle_welink_recordings(mid)
-
+    elif platform == 'tencent':
+        handle_tencent_recordings(mid)

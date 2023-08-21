@@ -9,49 +9,67 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 import datetime
 import time
 import os
+import sys
+import yaml
 from datetime import timedelta
+from meetings.utils.zoom_apis import getOauthToken
+
+
+CONFIG_PATH = os.getenv('CONFIG_PATH')
+if not os.path.exists(CONFIG_PATH):
+    sys.exit()
+with open(CONFIG_PATH, 'r') as f:
+    content = yaml.safe_load(f)
+DEFAULT_CONF = content
+if sys.argv[0] == 'uwsgi':
+    os.remove(CONFIG_PATH)
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-ZOOM_TOKEN = os.getenv('ZOOM_TOKEN', '')
+account_id = DEFAULT_CONF.get('ZOOM_ACCOUNT_ID', '')
+client_id = DEFAULT_CONF.get('ZOOM_CLIENT_ID', '')
+client_secret = DEFAULT_CONF.get('ZOOM_CLIENT_SECRET', '')
+ZOOM_TOKEN = getOauthToken(account_id, client_id, client_secret)
 
-WEBINAR_HOST = os.getenv('WEBINAR_HOST', '')
-
-WEBINAR_TEMPLATE_ID = os.getenv('WEBINAR_TEMPLATE_ID', '')
-
-CI_BOT_TOKEN = os.getenv('CI_BOT_TOKEN')
+CI_BOT_TOKEN = DEFAULT_CONF.get('CI_BOT_TOKEN')
 
 AUTH_USER_MODEL = 'meetings.User'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', '')
+SECRET_KEY = DEFAULT_CONF.get('SECRET_KEY', '')
 
 APP_CONF = {
-    'appid': os.getenv('APP_ID', ''),
-    'secret': os.getenv('APP_SECRET', '')
+    'appid': DEFAULT_CONF.get('APP_ID', ''),
+    'secret': DEFAULT_CONF.get('APP_SECRET', '')
 }
 
 MEETING_HOSTS = {
     'zoom': {
-        os.getenv('NEW_HOST_1', ''): os.getenv('HOST_1_ACCOUNT'),
-        os.getenv('NEW_HOST_2', ''): os.getenv('HOST_2_ACCOUNT'),
-        os.getenv('NEW_HOST_3', ''): os.getenv('HOST_3_ACCOUNT'),
-        os.getenv('NEW_HOST_4', ''): os.getenv('HOST_4_ACCOUNT')
+        DEFAULT_CONF.get('NEW_HOST_1', ''): DEFAULT_CONF.get('HOST_1_ACCOUNT'),
+        DEFAULT_CONF.get('NEW_HOST_2', ''): DEFAULT_CONF.get('HOST_2_ACCOUNT'),
+        DEFAULT_CONF.get('NEW_HOST_3', ''): DEFAULT_CONF.get('HOST_3_ACCOUNT'),
+        DEFAULT_CONF.get('NEW_HOST_4', ''): DEFAULT_CONF.get('HOST_4_ACCOUNT')
     },
     'welink': {
-        os.getenv('WELINK_HOST_1', ''): os.getenv('WELINK_HOST_1', '')
-    }
+        DEFAULT_CONF.get('WELINK_HOST_1', ''): DEFAULT_CONF.get('WELINK_HOST_1', '')
+    },
+    'tencent': [DEFAULT_CONF.get('TENCENT_ACCOUNT_1', '')]
 }
 
 WELINK_HOSTS = {
-    os.getenv('WELINK_HOST_1', ''): {
-        'account': os.getenv('WELINK_HOST_1_ACCOUNT', ''),
-        'pwd': os.getenv('WELINK_HOST_1_PWD', '')
+    DEFAULT_CONF.get('WELINK_HOST_1', ''): {
+        'account': DEFAULT_CONF.get('WELINK_HOST_1_ACCOUNT', ''),
+        'pwd': DEFAULT_CONF.get('WELINK_HOST_1_PWD', '')
     }
 }
+
+TX_MEETING_APPID = DEFAULT_CONF.get('TX_MEETING_APPID', '')
+TX_MEETING_SDKID = DEFAULT_CONF.get('TX_MEETING_SDKID', '')
+TX_MEETING_SECRETKEY = DEFAULT_CONF.get('TX_MEETING_SECRETKEY', '')
+TX_MEETING_SECRETID = DEFAULT_CONF.get('TX_MEETING_SECRETID')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -169,11 +187,11 @@ WSGI_APPLICATION = 'community_meetings.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'meetings',
-        'USER': os.getenv('DB_USER', "root"),
-        'PASSWORD': os.getenv('DB_PASSWORD', "123456"),
-        'HOST': os.getenv('DB_HOST', "127.0.0.1"),
-        'PORT': os.getenv('DB_PORT', "3306"),
+        'NAME': DEFAULT_CONF.get('DB_NAME', ""),
+        'USER': DEFAULT_CONF.get('DB_USER', "root"),
+        'PASSWORD': DEFAULT_CONF.get('DB_PASSWORD', "123456"),
+        'HOST': DEFAULT_CONF.get('DB_HOST', "127.0.0.1"),
+        'PORT': DEFAULT_CONF.get('DB_PORT', "3306"),
     }
 }
 
@@ -295,9 +313,9 @@ LOGGING = {
     }
 }
 
-GMAIL_USERNAME = os.getenv('GMAIL_USERNAME', '')
-GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD', '')
-SMTP_SERVER_HOST = os.getenv('SMTP_SERVER_HOST', '')
+GMAIL_USERNAME = DEFAULT_CONF.get('GMAIL_USERNAME', '')
+GMAIL_PASSWORD = DEFAULT_CONF.get('GMAIL_PASSWORD', '')
+SMTP_SERVER_HOST = DEFAULT_CONF.get('SMTP_SERVER_HOST', '')
 SMTP_SERVER_PORT = 25
-SMTP_SERVER_USER = os.getenv('SMTP_SERVER_USER', '')
-SMTP_SERVER_PASS = os.getenv('SMTP_SERVER_PASS', '')
+SMTP_SERVER_USER = DEFAULT_CONF.get('SMTP_SERVER_USER', '')
+SMTP_SERVER_PASS = DEFAULT_CONF.get('SMTP_SERVER_PASS', '')

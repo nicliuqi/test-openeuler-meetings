@@ -1,7 +1,7 @@
 import logging
-import os
 import sys
 from bilibili_api.user import get_videos_g
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from meetings.models import Record
 from obs import ObsClient
@@ -11,7 +11,7 @@ logger = logging.getLogger('log')
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        uid = int(os.getenv('BILI_UID', ''))
+        uid = int(settings.DEFAULT_CONF.get('BILI_UID', ''))
         if not uid:
             logger.error('uid is required')
             sys.exit(1)
@@ -20,10 +20,10 @@ class Command(BaseCommand):
         bvs = [x['bvid'] for x in videos]
         logger.info('所有B站过审视频的bvid: {}'.format(bvs))
         logger.info('B站过审视频数: {}'.format(len(bvs)))
-        access_key_id = os.getenv('ACCESS_KEY_ID', '')
-        secret_access_key = os.getenv('SECRET_ACCESS_KEY', '')
-        endpoint = os.getenv('OBS_ENDPOINT', '')
-        bucketName = os.getenv('OBS_BUCKETNAME', '')
+        access_key_id = settings.DEFAULT_CONF.get('ACCESS_KEY_ID', '')
+        secret_access_key = settings.DEFAULT_CONF.get('SECRET_ACCESS_KEY', '')
+        endpoint = settings.DEFAULT_CONF.get('OBS_ENDPOINT', '')
+        bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME', '')
         if not access_key_id or not secret_access_key or not endpoint or not bucketName:
             logger.error('losing required arguments for ObsClient')
             sys.exit(1)

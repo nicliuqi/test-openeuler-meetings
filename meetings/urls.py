@@ -7,9 +7,8 @@ from meetings.views import LoginView, GroupView, GroupsView, MeetingView, Meetin
     ActivityView, ActivitiesView, RecentActivitiesView, SponsorActivitiesView, ActivityRetrieveView, \
     ActivityUpdateView, ActivityDraftView, ActivitiesDraftView, SponsorActivityDraftView, DraftUpdateView, \
     DraftPublishView, SponsorActivitiesPublishingView, ActivityCollectView, ActivityCollectDelView, \
-    MyActivityCollectionsView, ActivityRegisterView, ApplicantInfoView, RegisterActivitiesView, ApplicantsInfoView, \
-    FeedbackView, CountActivitiesView, MyCountsView, TicketView, MeetingsRecentlyView, ActivitySignView, \
-    ActivityRegistrantsView, ActivitiesDataView
+    MyActivityCollectionsView, FeedbackView, CountActivitiesView, MyCountsView, MeetingsRecentlyView, \
+    ActivitiesDataView, AgreePrivacyPolicyView
 
 urlpatterns = [
     path('login/', LoginView.as_view()),  # 登陆
@@ -62,15 +61,9 @@ urlpatterns = [
     path('collectactivity/', ActivityCollectView().as_view()),  # 收藏活动
     path('collectactivitydel/<int:pk>/', ActivityCollectDelView.as_view()),  # 取消收藏活动
     path('collectactivities/', MyActivityCollectionsView.as_view()),  # 我收藏的活动列表
-    path('activityregister/', ActivityRegisterView.as_view()),  # 活动报名
-    path('applicantinfo/<int:pk>/', ApplicantInfoView.as_view()),  # 报名者信息详情
-    path('registeractivities/', RegisterActivitiesView.as_view()),  # 我报名的活动列表
-    path('applicantsinfo/', ApplicantsInfoView.as_view()),  # 报名者信息列表
     path('feedback/', FeedbackView.as_view()),  # 意见反馈
     path('countactivities/', CountActivitiesView.as_view()),  # 各类活动计数
     path('mycounts/', MyCountsView.as_view()),  # 我的各类计数
-    path('ticket/<int:pk>/', TicketView.as_view()),  # 查看活动门票
-    path('activitysign/', ActivitySignView.as_view()),  # 活动签到
-    path('registrants/<int:pk>/', ActivityRegistrantsView.as_view()),  # 活动报名信息列表
     path('activitiesdata/', ActivitiesDataView.as_view()),  # 活动日历
+    path('agree/', AgreePrivacyPolicyView.as_view()),  # 同意更新隐私政策
 ]

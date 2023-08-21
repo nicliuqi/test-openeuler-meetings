@@ -4,6 +4,7 @@ import sys
 import json
 import tempfile
 import os
+from django.conf import settings
 from obs import ObsClient
 
 logger = logging.getLogger('log')
@@ -49,10 +50,10 @@ def save_temp_img(content):
 
 
 def upload_to_obs(tmp_file, activity_id):
-    access_key_id = os.getenv('ACCESS_KEY_ID', '')
-    secret_access_key = os.getenv('SECRET_ACCESS_KEY', '')
-    endpoint = os.getenv('OBS_ENDPOINT', '')
-    bucketName = os.getenv('OBS_BUCKETNAME_SECOND', '')
+    access_key_id = settings.DEFAULT_CONF.get('ACCESS_KEY_ID', '')
+    secret_access_key = settings.DEFAULT_CONF.get('SECRET_ACCESS_KEY', '')
+    endpoint = settings.DEFAULT_CONF.get('OBS_ENDPOINT', '')
+    bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME_SECOND', '')
     if not access_key_id or not secret_access_key or not endpoint or not bucketName:
         logger.error('losing required arguments for ObsClient')
         sys.exit(1)

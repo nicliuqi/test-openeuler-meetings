@@ -10,13 +10,14 @@ from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import GenericAPIView
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, \
     UpdateModelMixin
 from rest_framework_simplejwt import authentication
 from meetings.models import User, Group, Meeting, GroupUser, Collect, Video, Record, Activity, ActivityCollect, \
-    ActivityRegister, Feedback, ActivitySign
+    Feedback
 from meetings.permissions import MaintainerPermission, AdminPermission, ActivityAdminPermission, SponsorPermission, \
         QueryPermission
 from meetings.serializers import LoginSerializer, GroupsSerializer, MeetingSerializer, UsersSerializer, \
@@ -24,18 +25,25 @@ from meetings.serializers import LoginSerializer, GroupsSerializer, MeetingSeria
     MeetingListSerializer, GroupUserDelSerializer, UserInfoSerializer, SigsSerializer, MeetingsDataSerializer, \
     AllMeetingsSerializer, CollectSerializer, SponsorSerializer, SponsorInfoSerializer, ActivitySerializer, \
     ActivitiesSerializer, ActivityDraftUpdateSerializer, ActivityUpdateSerializer,  ActivityCollectSerializer, \
-    ActivityRegisterSerializer, ApplicantInfoSerializer, FeedbackSerializer, ActivityRetrieveSerializer, \
-    ActivitySignSerializer, ActivityRegistrantsSerializer
+    FeedbackSerializer, ActivityRetrieveSerializer
 from rest_framework.response import Response
 from multiprocessing import Process
 from meetings.send_email import sendmail
 from rest_framework import permissions
-from meetings.utils import gene_wx_code, send_applicants_info, send_feedback, invite, send_start_url, gene_sign_code, \
-        drivers
+from meetings.utils import gene_wx_code, send_feedback, invite, send_start_url, drivers
+from rest_framework_simplejwt.tokens import RefreshToken
+from meetings.auth import CustomAuthentication
 
 logger = logging.getLogger('log')
 offline = 1
 online = 2
+
+
+def refresh_access(user):
+    refresh = RefreshToken.for_user(user)
+    access = str(refresh.access_token)
+    User.objects.filter(id-user.id).update(signature=access)
+    return access
 
 
 class LoginView(GenericAPIView, CreateModelMixin, ListModelMixin):
@@ -88,6 +96,8 @@ class UsersIncludeView(GenericAPIView, ListModelMixin):
     queryset = User.objects.all()
     filter_backends = [SearchFilter]
     search_fields = ['nickname']
+    authentication_classes = (authentication.JWTAuthentication,)
+    permission_classes = (AdminPermission,)
 
     @swagger_auto_schema(operation_summary='查询所选SIG组的所有成员')
     def get(self, request, *args, **kwargs):
@@ -109,6 +119,8 @@ class UsersExcludeView(GenericAPIView, ListModelMixin):
     queryset = User.objects.all().order_by('nickname')
     filter_backends = [SearchFilter]
     search_fields = ['nickname']
+    authentication_classes = (authentication.JWTAuthentication,)
+    permission_classes = (AdminPermission,)
 
     @swagger_auto_schema(operation_summary='查询不在该组的所有用户')
     def get(self, request, *args, **kwargs):
@@ -145,39 +157,70 @@ class UserView(GenericAPIView, UpdateModelMixin):
     """更新用户gitee_name"""
     serializer_class = UserSerializer
     queryset = User.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (AdminPermission,)
 
     @swagger_auto_schema(operation_summary='更新用户gitee_name')
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        access = refresh_access(self.request.user)
+        data = serializer.data
+        data['access'] = access
+        response = Response()
+        response.data = data
+        return response
+
 
 class GroupUserAddView(GenericAPIView, CreateModelMixin):
     """SIG组批量新增成员"""
     serializer_class = GroupUserAddSerializer
     queryset = GroupUser.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (AdminPermission,)
 
     @swagger_auto_schema(operation_summary='SIG组批量新增成员')
     def post(self, request, *args, **kwargs):
         return self.create(request, *args, **kwargs)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        access = refresh_access(self.request.user)
+        data = serializer.data
+        data['access'] = access
+        response = Response()
+        response.data = data
+        response.status = status.HTTP_201_CREATED
+        response.headers = headers
+        return response
+
 
 class GroupUserDelView(GenericAPIView, CreateModelMixin):
     """批量删除组成员"""
     serializer_class = GroupUserDelSerializer
     queryset = GroupUser.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (AdminPermission,)
 
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         group_id = self.request.data.get('group_id')
         ids = self.request.data.get('ids')
         ids_list = [int(x) for x in ids.split('-')]
         GroupUser.objects.filter(group_id=group_id, user_id__in=ids_list).delete()
-        return JsonResponse({'code': 204, 'msg': '删除成功'})
+        return JsonResponse({'code': 204, 'msg': '删除成功', 'access': access})
 
 
 class MeetingsWeeklyView(GenericAPIView, ListModelMixin):
@@ -231,18 +274,19 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
     """删除会议(mid)"""
     serializer_class = MeetingSerializer
     queryset = Meeting.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (MaintainerPermission,)
 
     @swagger_auto_schema(operation_summary='删除会议')
     def delete(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         mid = kwargs.get('mid')
         if not Meeting.objects.filter(mid=mid):
-            resp = JsonResponse({'code': 404, 'msg': 'Not Found'})
+            resp = JsonResponse({'code': 404, 'msg': 'Not Found', 'access': access})
             resp.status_code = 404
             return resp
         if not (Meeting.objects.filter(mid=mid, user_id=self.request.user.id) or User.objects.filter(id=self.request.user.id, level=3)):
-            resp = JsonResponse({'code': 401, 'msg': 'Unauthorized'})
+            resp = JsonResponse({'code': 401, 'msg': 'Unauthorized', 'access': access})
             resp.status_code = 401
             return resp
 
@@ -289,7 +333,7 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
                         logger.info('meeting {} cancel message sent to {}.'.format(mid, nickname))
                 # 删除收藏
                 collection.delete()
-        return JsonResponse({"code": 204, "message": "Delete successfully."})
+        return JsonResponse({"code": 204, "message": "Delete successfully.", "access": access})
 
     def get_remove_template(self, openid, topic, time, mid):
         if len(topic) > 20:
@@ -444,12 +488,13 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
     """创建会议"""
     serializer_class = MeetingSerializer
     queryset = Meeting.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (MaintainerPermission,)
 
     @swagger_auto_schema(operation_summary='创建会议')
     def post(self, request, *args, **kwargs):
         t1 = time.time()
+        access = refresh_access(self.request.user)
         # 获取data
         data = self.request.data
         try:
@@ -470,14 +515,14 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
             record = data['record'] if 'record' in data else ''
             etherpad = data['etherpad']
         except KeyError:
-            return JsonResponse({'code': 400, 'msg': 'Bad Request'})
+            return JsonResponse({'code': 400, 'msg': 'Bad Request', 'access': access})
         start_time = ' '.join([date, start])
         if start_time < datetime.datetime.now().strftime('%Y-%m-%d %H:%M'):
             logger.warning('The start time should not be earlier than the current time.')
-            return JsonResponse({'code': 1005, 'message': '请输入正确的开始时间'})
+            return JsonResponse({'code': 1005, 'message': '请输入正确的开始时间', 'access': access})
         if start >= end:
             logger.warning('The end time must be greater than the start time.')
-            return JsonResponse({'code': 1001, 'message': '请输入正确的结束时间'})
+            return JsonResponse({'code': 1001, 'message': '请输入正确的结束时间', 'access': access})
         start_search = datetime.datetime.strftime(
             (datetime.datetime.strptime(start, '%H:%M') - datetime.timedelta(minutes=30)),
             '%H:%M')
@@ -503,7 +548,7 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
         logger.info('avilable_host_id:{}'.format(available_host_id))
         if len(available_host_id) == 0:
             logger.warning('{}暂无可用host'.format(platform))
-            return JsonResponse({'code': 1000, 'message': '暂无可用host,请前往官网查看预定会议'})
+            return JsonResponse({'code': 1000, 'message': '暂无可用host,请前往官网查看预定会议', 'access': access})
         # 从available_host_id中随机生成一个host_id,并在host_dict中取出
         host_id = random.choice(available_host_id)
         host = host_dict[host_id]
@@ -512,7 +557,7 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
 
         status, content = drivers.createMeeting(platform, date, start, end, topic, host, record)
         if status not in [200, 201]:
-            return JsonResponse({'code': 400, 'msg': 'Bad Request'})
+            return JsonResponse({'code': 400, 'msg': 'Bad Request', 'access': access})
         mid = content['mid']
         start_url = content['start_url']
         join_url = content['join_url']
@@ -572,7 +617,7 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
             logger.info('meeting {} was created with auto recording.'.format(mid))
 
         # 返回请求数据
-        resp = {'code': 201, 'message': '创建成功'}
+        resp = {'code': 201, 'message': '创建成功', 'access': access}
         meeting = Meeting.objects.get(mid=mid)
         resp['id'] = meeting.id
         t3 = time.time()
@@ -616,17 +661,18 @@ class CollectView(GenericAPIView, ListModelMixin, CreateModelMixin):
     serializer_class = CollectSerializer
     queryset = Collect.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
 
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         user_id = self.request.user.id
         meeting_id = self.request.data['meeting']
         if not meeting_id:
-            return JsonResponse({'code': 400, 'msg': 'meeting不能为空'})
+            return JsonResponse({'code': 400, 'msg': 'meeting不能为空', 'access': access})
         if not Collect.objects.filter(meeting_id=meeting_id, user_id=user_id):
             Collect.objects.create(meeting_id=meeting_id, user_id=user_id)
         collection_id = Collect.objects.get(meeting_id=meeting_id, user_id=user_id).id
-        resp = {'code': 201, 'msg': 'collect successfully', 'collection_id': collection_id}
+        resp = {'code': 201, 'msg': 'collect successfully', 'collection_id': collection_id, 'access': access}
         return JsonResponse(resp)
 
     def get_queryset(self):
@@ -639,10 +685,19 @@ class CollectDelView(GenericAPIView, DestroyModelMixin):
     serializer_class = CollectSerializer
     queryset = Collect.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
 
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        access = refresh_access(self.request.user)
+        response = Response()
+        response.data = {'access': access}
+        response.status = status.HTTP_204_NO_CONTENT
+        return response
 
     def get_queryset(self):
         queryset = Collect.objects.filter(user_id=self.request.user.id)
@@ -712,41 +767,59 @@ class NonSponsorView(GenericAPIView, ListModelMixin):
 class SponsorAddView(GenericAPIView, CreateModelMixin):
     """批量添加活动发起人"""
     queryset = User.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
     @swagger_auto_schema(operation_summary='批量添加活动发起人')
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         ids = self.request.data.get('ids')
         ids_list = [int(x) for x in ids.split('-')]
         User.objects.filter(id__in=ids_list, activity_level=1).update(activity_level=2)
-        return JsonResponse({'code': 201, 'msg': '添加成功'})
+        return JsonResponse({'code': 201, 'msg': '添加成功', 'access': access})
 
 
 class SponsorDelView(GenericAPIView, CreateModelMixin):
     """批量删除组成员"""
     queryset = GroupUser.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
     @swagger_auto_schema(operation_summary='批量删除活动发起人')
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         ids = self.request.data.get('ids')
         ids_list = [int(x) for x in ids.split('-')]
         User.objects.filter(id__in=ids_list, activity_level=2).update(activity_level=1)
-        return JsonResponse({'code': 204, 'msg': '删除成功'})
+        return JsonResponse({'code': 204, 'msg': '删除成功', 'access': access})
 
 
 class SponsorInfoView(GenericAPIView, UpdateModelMixin):
     """修改活动发起人信息"""
     serializer_class = SponsorInfoSerializer
     queryset = User.objects.filter(activity_level=2)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
     @swagger_auto_schema(operation_summary='修改活动发起人信息')
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        access = refresh_access(self.request.user)
+        data = serializer.data
+        data['access'] = access
+        response = Response()
+        response.data = data
+        return response
 
 
 class DraftsView(GenericAPIView, ListModelMixin):
@@ -777,21 +850,23 @@ class ActivityView(GenericAPIView, CreateModelMixin):
     """创建活动并申请发布"""
     serializer_class = ActivitySerializer
     queryset = Activity.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
     @swagger_auto_schema(operation_summary='创建活动并申请发布')
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         data = self.request.data
         title = data['title']
         date = data['date']
         if date < (datetime.datetime.now() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'):
-            return JsonResponse({'code': 400, 'msg': '请最早提前一天申请活动'})
+            return JsonResponse({'code': 400, 'msg': '请最早提前一天申请活动', 'access': access})
         activity_type = data['activity_type']
         synopsis = data['synopsis'] if 'synopsis' in data else None
         poster = data['poster']
         user_id = self.request.user.id
         enterprise = User.objects.get(id=user_id).enterprise
+        register_url = data.get('register_url', '')
         # 线下活动
         if activity_type == offline:
             address = data['address']
@@ -811,7 +886,8 @@ class ActivityView(GenericAPIView, CreateModelMixin):
                 poster=poster,
                 user_id=user_id,
                 status=2,
-                enterprise=enterprise
+                enterprise=enterprise,
+                register_url=register_url
             )
         # 线上活动
         if activity_type == online:
@@ -828,9 +904,10 @@ class ActivityView(GenericAPIView, CreateModelMixin):
                 poster=poster,
                 user_id=user_id,
                 status=2,
-                enterprise=enterprise
+                enterprise=enterprise,
+                register_url=register_url
             )
-        return JsonResponse({'code': 201, 'msg': '活动申请发布成功！'})
+        return JsonResponse({'code': 201, 'msg': '活动申请发布成功！', 'access': access})
 
 
 class ActivitiesView(GenericAPIView, ListModelMixin):
@@ -916,7 +993,7 @@ class ActivityUpdateView(GenericAPIView, UpdateModelMixin):
     """修改一个活动"""
     serializer_class = ActivityUpdateSerializer
     queryset = Activity.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
     @swagger_auto_schema(operation_summary='修改活动')
@@ -926,6 +1003,22 @@ class ActivityUpdateView(GenericAPIView, UpdateModelMixin):
         schedules = self.request.data['schedules']
         invite.add_panelists(mid, schedules)
         return self.update(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+        access = refresh_access(self.request.user)
+        data = serializer.data
+        data['access'] = access
+        response = Response()
+        response.data = data
+        return response
 
     def get_queryset(self):
         user_id = self.request.user.id
@@ -939,11 +1032,12 @@ class ActivityUpdateView(GenericAPIView, UpdateModelMixin):
 class ActivityPublishView(GenericAPIView, UpdateModelMixin):
     """通过申请"""
     queryset = Activity.objects.filter(is_delete=0, status=2)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
     @swagger_auto_schema(operation_summary='活动过审')
     def put(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
         appid = settings.APP_CONF['appid']
         secret = settings.APP_CONF['secret']
@@ -951,110 +1045,65 @@ class ActivityPublishView(GenericAPIView, UpdateModelMixin):
             logger.info('活动id: {}'.format(activity_id))
             img_url = gene_wx_code.run(appid, secret, activity_id)
             logger.info('生成活动页面二维码: {}'.format(img_url))
-            sign_url = gene_sign_code.run(appid, secret, activity_id)
-            logger.info('生成活动签到二维码: {}'.format(sign_url))
-            Activity.objects.filter(id=activity_id, status=2).update(status=3, wx_code=img_url, sign_url=sign_url)
+            Activity.objects.filter(id=activity_id, status=2).update(status=3, wx_code=img_url)
             logger.info('活动通过审核')
-            activity = Activity.objects.get(id=activity_id)
-            if activity.activity_type == online:
-                date = activity.date
-                title = activity.title
-                start = activity.start
-                end = activity.end
-                synopsis = activity.synopsis
-                # 创建网络研讨会
-                start_time = (datetime.datetime.strptime(date + start, '%Y-%m-%d%H:%M') - datetime.timedelta(hours=8)).strftime('%Y-%m-%dT%H:%M:%SZ')
-                duration = int((datetime.datetime.strptime(end, '%H:%M') - datetime.datetime.strptime(start, '%H:%M')).seconds / 60)
-                data = {
-                    "topic": title,
-                    "start_time": start_time,
-                    "duration": duration,
-                    "agenda": synopsis,
-                    "template_id": settings.WEBINAR_TEMPLATE_ID,
-                    "settings": {
-                        "host_video": True,
-                        "panelists_video": True,
-                        "request_permission_to_unmute_participants": True
-                    }
-                }
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer {}".format(settings.ZOOM_TOKEN)
-                }
-                r = requests.post('https://api.zoom.us/v2/users/{}/webinars'.format(settings.WEBINAR_HOST), headers=headers, data=json.dumps(data))
-                if r.status_code == 201:
-                    logger.info('创建网络研讨会')
-                    start_url = r.json()['start_url']
-                    join_url = r.json()['join_url']
-                    mid = r.json()['id']
-                    Activity.objects.filter(id=activity_id).update(start_url=start_url, join_url=join_url, mid=mid)
-                    # 发送start_url给sponsor
-                    activity = Activity.objects.get(id=activity_id)
-                    date = activity.date
-                    start = activity.start
-                    topic = activity.title
-                    start_url = activity.start_url
-                    password = r.json()['password']
-                    summary = activity.synopsis,
-                    user = User.objects.get(id=activity.user_id)
-                    email = user.email
-                    send_start_url.run(date, start, topic, start_url, password, summary, email)
-                    logger.info('成功发送主持人地址邮件')
-                    invite.invite_panelists(mid)
-                    logger.info('成功发送嘉宾邀请邮件')
-            return JsonResponse({'code': 201, 'msg': '活动通过审核，已发布'})
+            return JsonResponse({'code': 201, 'msg': '活动通过审核，已发布', 'access': access})
         else:
-            return JsonResponse({'code': 404, 'msg': '无此数据'})
+            return JsonResponse({'code': 404, 'msg': '无此数据', 'access': access})
 
 
 class ActivityRejectView(GenericAPIView, UpdateModelMixin):
     """驳回申请"""
     queryset = Activity.objects.filter(is_delete=0, status=2)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
     @swagger_auto_schema(operation_summary='驳回申请')
     def put(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
         if activity_id in self.queryset.values_list('id', flat=True):
             Activity.objects.filter(id=activity_id, status=2).update(status=1)
-            return JsonResponse({'code': 201, 'msg': '活动申请已驳回'})
+            return JsonResponse({'code': 201, 'msg': '活动申请已驳回', 'access': access})
         else:
-            return JsonResponse({'code': 404, 'msg': '无此数据'})
+            return JsonResponse({'code': 404, 'msg': '无此数据', 'access': access})
 
 
 class ActivityDelView(GenericAPIView, UpdateModelMixin):
     """删除一个活动"""
     queryset = Activity.objects.filter(is_delete=0, status__gt=2)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
     @swagger_auto_schema(operation_summary='删除活动')
     def put(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
         Activity.objects.filter(id=activity_id).update(is_delete=1)
-        return JsonResponse({'code': 204, 'msg': '成功删除活动'})
+        return JsonResponse({'code': 204, 'msg': '成功删除活动', 'access': access})
 
 
 class ActivityDraftView(GenericAPIView, CreateModelMixin):
     """创建活动草案"""
     serializer_class = ActivitySerializer
     queryset = Activity.objects.all()
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
     @swagger_auto_schema(operation_summary='创建活动草案')
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         data = self.request.data
         title = data['title']
         date = data['date']
         if date < (datetime.datetime.now() + datetime.timedelta(days=1)).strftime('%Y-%m-%d'):
-            return JsonResponse({'code': 400, 'msg': '请最早提前一天申请活动'})
+            return JsonResponse({'code': 400, 'msg': '请最早提前一天申请活动', 'access': access})
         activity_type = data['activity_type']
         synopsis = data['synopsis'] if 'synopsis' in data else None
         poster = data['poster']
         user_id = self.request.user.id
         enterprise = User.objects.get(id=user_id).enterprise
+        register_url = data.get('register_url')
         # 线下活动
         if activity_type == offline:
             address = data['address']
@@ -1073,7 +1122,8 @@ class ActivityDraftView(GenericAPIView, CreateModelMixin):
                 schedules=json.dumps(data['schedules']),
                 poster=poster,
                 user_id=user_id,
-                enterprise=enterprise
+                enterprise=enterprise,
+                register_url=register_url
             )
         # 线上活动
         if activity_type == online:
@@ -1089,9 +1139,10 @@ class ActivityDraftView(GenericAPIView, CreateModelMixin):
                 schedules=json.dumps(data['schedules']),
                 poster=poster,
                 user_id=user_id,
-                enterprise=enterprise
+                enterprise=enterprise,
+                register_url=register_url
             )
-        return JsonResponse({'code': 201, 'msg': '活动草案创建成功！'})
+        return JsonResponse({'code': 201, 'msg': '活动草案创建成功！', 'access': access})
 
 
 class ActivitiesDraftView(GenericAPIView, ListModelMixin):
@@ -1125,6 +1176,15 @@ class SponsorActivityDraftView(GenericAPIView, RetrieveModelMixin, DestroyModelM
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        access = refresh_access(self.request.user)
+        response = Response()
+        response.data = {'access': access}
+        response.status = status.HTTP_204_NO_CONTENT
+        return response
+
     def get_queryset(self):
         queryset = Activity.objects.filter(is_delete=0, status=1, user_id=self.request.user.id).order_by('-date', 'id')
         return queryset
@@ -1134,10 +1194,11 @@ class DraftUpdateView(GenericAPIView, UpdateModelMixin):
     """修改活动草案"""
     serializer_class = ActivityDraftUpdateSerializer
     queryset = Activity.objects.filter(is_delete=0, status=1)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
     def put(self, reuqest, *args, **kwargs):
+        access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
         data = self.request.data
         title = data['title']
@@ -1146,6 +1207,7 @@ class DraftUpdateView(GenericAPIView, UpdateModelMixin):
         synopsis = data['synopsis'] if 'synopsis' in data else None
         poster = data['poster']
         user_id = self.request.user.id
+        register_url = data.get('register_url')
         if activity_type == offline:
             address = data['address']
             detail_address = data['detail_address']
@@ -1161,7 +1223,8 @@ class DraftUpdateView(GenericAPIView, UpdateModelMixin):
                 longitude=longitude,
                 latitude=latitude,
                 schedules=json.dumps(data['schedules']),
-                poster=poster
+                poster=poster,
+                register_url=register_url
             )
         if activity_type == online:
             start = data['start']
@@ -1174,19 +1237,21 @@ class DraftUpdateView(GenericAPIView, UpdateModelMixin):
                 activity_type=activity_type,
                 synopsis=synopsis,
                 schedules=json.dumps(data['schedules']),
-                poster=poster
+                poster=poster,
+                register_url=register_url
             )
-        return JsonResponse({'code': 201, 'msg': '修改并保存活动草案'})
+        return JsonResponse({'code': 201, 'msg': '修改并保存活动草案', 'access': access})
 
 
 class DraftPublishView(GenericAPIView, UpdateModelMixin):
     """修改活动草案并申请发布"""
     serializer_class = ActivityDraftUpdateSerializer
     queryset = Activity.objects.filter(is_delete=0, status=1)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
     def put(self, reuqest, *args, **kwargs):
+        access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
         data = self.request.data
         title = data['title']
@@ -1227,7 +1292,7 @@ class DraftPublishView(GenericAPIView, UpdateModelMixin):
                 poster=poster,
                 status=2
             )
-        return JsonResponse({'code': 201, 'msg': '申请发布活动'})
+        return JsonResponse({'code': 201, 'msg': '申请发布活动', 'access': access})
 
 
 class SponsorActivitiesPublishingView(GenericAPIView, ListModelMixin):
@@ -1251,14 +1316,15 @@ class ActivityCollectView(GenericAPIView, CreateModelMixin):
     serializer_class = ActivityCollectSerializer
     queryset = ActivityCollect.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
 
     @swagger_auto_schema(operation_summary='收藏活动')
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         user_id = self.request.user.id
         activity_id = self.request.data['activity']
         ActivityCollect.objects.create(activity_id=activity_id, user_id=user_id)
-        return JsonResponse({'code': 201, 'msg': '收藏活动'})
+        return JsonResponse({'code': 201, 'msg': '收藏活动', 'access': access})
 
 
 class ActivityCollectDelView(GenericAPIView, DestroyModelMixin):
@@ -1266,11 +1332,20 @@ class ActivityCollectDelView(GenericAPIView, DestroyModelMixin):
     serializer_class = ActivityCollectSerializer
     queryset = ActivityCollect.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
 
     @swagger_auto_schema(operation_summary='取消收藏活动')
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        access = refresh_access(self.request.user)
+        response = Response()
+        response.data = {'access': access}
+        response.status = status.HTTP_204_NO_CONTENT
+        return response
 
     def get_queryset(self):
         queryset = ActivityCollect.objects.filter(user_id=self.request.user.id)
@@ -1295,113 +1370,23 @@ class MyActivityCollectionsView(GenericAPIView, ListModelMixin):
         return queryset
 
 
-class ActivityRegisterView(GenericAPIView, CreateModelMixin):
-    """活动报名"""
-    serializer_class = ActivityRegisterSerializer
-    queryset = ActivityRegister.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
-
-    @swagger_auto_schema(operation_summary='活动报名')
-    def post(self, request, *args, **kwargs):
-        data = self.request.data
-        activity_id = data['activity']
-        user_id = self.request.user.id
-        if Activity.objects.filter(id=activity_id, user_id=user_id):
-            return JsonResponse({'code': 403, 'msg': '不能报名自己发起的活动'})
-        name = data['name']
-        telephone = data['telephone']
-        email = data['email']
-        company = data['company']
-        profession = data['profession'] if 'profession' in data else User.objects.get(id=user_id).profession
-        gitee_name = data['gitee_name'] if 'gitee_name' in data else User.objects.get(id=user_id).gitee_name
-        register_number = User.objects.get(id=self.request.user.id).register_number
-        register_number += 1
-        User.objects.filter(id=self.request.user.id).update(
-            name=name,
-            telephone=telephone,
-            email=email,
-            company=company,
-            profession=profession,
-            gitee_name=gitee_name,
-            register_number=register_number
-        )
-        ActivityRegister.objects.create(activity_id=activity_id, user_id=user_id)
-        register_number = len(ActivityRegister.objects.filter(user_id=self.request.user.id))
-        return JsonResponse({'code': 201, 'msg': '报名成功', 'register_number': register_number})
-
-
-class ApplicantInfoView(GenericAPIView, RetrieveModelMixin):
-    """报名者信息详情"""
-    serializer_class = ApplicantInfoSerializer
-    queryset = User.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
-
-    @swagger_auto_schema(operation_summary='报名者信息详情')
-    def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
-
-
-class ApplicantsInfoView(GenericAPIView, CreateModelMixin):
-    """报名者信息列表"""
-    queryset = ActivityRegister.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
-
-    @swagger_auto_schema(operation_summary='报名者信息列表')
-    def post(self, request, *args, **kwargs):
-        data = self.request.data
-        try:
-            activity_id = data['activity']
-            mailto = data['mailto']
-            if not re.match(r'^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$', mailto):
-                return JsonResponse({'code': 400, 'msg': '请填入正确的收件邮箱'})
-            user_id = self.request.user.id
-            if not Activity.objects.filter(id=activity_id, user_id=user_id) and User.objects.get(
-                    id=user_id).activity_level != 3:
-                return JsonResponse({'code': 403, 'msg': '无权查看该活动的报名列表'})
-            self.queryset = ActivityRegister.objects.filter(activity_id=activity_id)
-            send_applicants_info.run(self.queryset, mailto)
-            return JsonResponse({'code': '200', 'msg': '已发送活动报名信息'})
-        except KeyError:
-            return JsonResponse({'code': 400, 'msg': '需要activity和mailto两个参数'})
-
-
-class RegisterActivitiesView(GenericAPIView, ListModelMixin):
-    """我报名的活动列表"""
-    serializer_class = ActivitiesSerializer
-    queryset = Activity.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
-
-    @swagger_auto_schema(operation_summary='我报名的活动列表')
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-
-    def get_queryset(self):
-        user_id = self.request.user.id
-        register_lst = ActivityRegister.objects.filter(user_id=user_id).values_list('activity')
-        queryset = Activity.objects.filter(is_delete=0, id__in=register_lst).order_by('-date', 'id')
-        return queryset
-
-
 class FeedbackView(GenericAPIView, CreateModelMixin):
     """意见反馈"""
     serializer_class = FeedbackSerializer
     queryset = Feedback.objects.all()
     permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
+    authentication_classes = (CustomAuthentication,)
 
     @swagger_auto_schema(operation_summary='意见反馈')
     def post(self, request, *args, **kwargs):
+        access = refresh_access(self.request.user)
         data = self.request.data
         try:
             feedback_type = data['feedback_type']
             feedback_content = data['feedback_content']
             feedback_email = data['feedback_email']
             if not re.match(r'^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$', feedback_email):
-                return JsonResponse({'code': 400, 'msg': '请填入正确的收件邮箱'})
+                return JsonResponse({'code': 400, 'msg': '请填入正确的收件邮箱', 'access': access})
             user_id = self.request.user.id
             Feedback.objects.create(
                 feedback_type=feedback_type,
@@ -1414,10 +1399,11 @@ class FeedbackView(GenericAPIView, CreateModelMixin):
             if feedback_type == 2:
                 feedback_type = '产品建议'
             send_feedback.run(feedback_type, feedback_email, feedback_content)
-            return JsonResponse({'code': 201, 'msg': '反馈意见已收集'})
+            return JsonResponse({'code': 201, 'msg': '反馈意见已收集', 'access': access})
         except KeyError:
             return JsonResponse(
-                {'code': 400, 'msg': 'feedback_type, feedback_content and feedback_email are all required!'})
+                {'code': 400, 'msg': 'feedback_type, feedback_content and feedback_email are all required!', 'access':
+                 access})
 
 
 class CountActivitiesView(GenericAPIView, ListModelMixin):
@@ -1484,17 +1470,12 @@ class MyCountsView(GenericAPIView, ListModelMixin):
         if level == 3:
             created_meetings_count = len(Meeting.objects.filter(is_delete=0).values())
             res['created_meetings_count'] = created_meetings_count
-        if activity_level < 3:
-            registerd_activities_count = len(Activity.objects.filter(is_delete=0, status__gt=2, id__in=(
-                ActivityRegister.objects.filter(user_id=user_id).values_list('activity_id', flat=True))).values())
-            res['registerd_activities_count'] = registerd_activities_count
         if activity_level == 2:
             published_activities_count = len(
                 Activity.objects.filter(is_delete=0, status__gt=2, user_id=user_id).values())
             drafts_count = len(Activity.objects.filter(is_delete=0, status=1, user_id=user_id).values())
             publishing_activities_count = len(Activity.objects.filter(is_delete=0, status=2, user_id=user_id).values())
             res['published_activities_count'] = published_activities_count
-            res['register_table_count'] = published_activities_count
             res['drafts_count'] = drafts_count
             res['publishing_activities_count'] = publishing_activities_count
         if activity_level == 3:
@@ -1502,58 +1483,9 @@ class MyCountsView(GenericAPIView, ListModelMixin):
             drafts_count = len(Activity.objects.filter(is_delete=0, status=1, user_id=user_id).values())
             publishing_activities_count = len(Activity.objects.filter(is_delete=0, status=2).values())
             res['published_activities_count'] = published_activities_count
-            res['register_table_count'] = published_activities_count
             res['drafts_count'] = drafts_count
             res['publishing_activities_count'] = publishing_activities_count
         return JsonResponse(res)
-
-
-class TicketView(GenericAPIView, RetrieveModelMixin):
-    """查看活动门票"""
-    queryset = Activity.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
-
-    @swagger_auto_schema(operation_summary='查看活动门票')
-    def get(self, request, *args, **kwargs):
-        activity_id = self.kwargs.get('pk')
-        user_id = self.request.user.id
-        if not ActivityRegister.objects.filter(activity_id=activity_id, user_id=user_id):
-            return JsonResponse({'code': 404, 'msg': '用户还没有报名这个活动'})
-        res = {
-            'title': self.queryset.get(id=activity_id).title,
-            'poster': self.queryset.get(id=activity_id).poster,
-            'name': User.objects.get(id=user_id).name,
-            'telephone': User.objects.get(id=user_id).telephone
-        }
-        return JsonResponse(res)
-
-
-class ActivitySignView(GenericAPIView, CreateModelMixin):
-    """活动签到"""
-    serializer_class = ActivitySignSerializer
-    queryset = ActivitySign.objects.all()
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (authentication.JWTAuthentication,)
-
-    def post(self, request, *args, **kwargs):
-        user_id = self.request.user.id
-        activity_id = self.request.data['activity']
-        if not ActivityRegister.objects.filter(activity_id=activity_id, user_id=user_id):
-            return JsonResponse({'code': 404, 'msg': '用户还没有报名这个活动'})
-        if not ActivitySign.objects.filter(activity_id=activity_id, user_id=user_id):
-            ActivitySign.objects.create(activity_id=activity_id, user_id=user_id)
-        return JsonResponse({'code': 201, 'msg': '活动签到'})
-
-
-class ActivityRegistrantsView(GenericAPIView, RetrieveModelMixin):
-    """活动报名者信息"""
-    serializer_class = ActivityRegistrantsSerializer
-    queryset = Activity.objects.filter(is_delete=0)
-    permission_classes = (QueryPermission,)
-
-    def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
 
 
 class ActivitiesDataView(GenericAPIView, ListModelMixin):
@@ -1587,6 +1519,7 @@ class ActivitiesDataView(GenericAPIView, ListModelMixin):
                         'synopsis': activity.synopsis,
                         'sign_url': activity.sign_url,
                         'replay_url': activity.replay_url,
+                        'register_url': activity.register_url,
                         'poster': activity.poster,
                         'wx_code': activity.wx_code,
                         'schedules': json.loads(activity.schedules)
@@ -1594,3 +1527,27 @@ class ActivitiesDataView(GenericAPIView, ListModelMixin):
                 }    
             )    
         return Response({'tableData': tableData})
+
+
+class AgreePrivacyPolicyView(GenericAPIView, UpdateModelMixin):
+    authentication_classes = (CustomAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def put(self, request, *args, **kwargs):
+        now_time = datetime.datetime.now()
+        access = refresh_access(self.request.user)
+        if User.objects.get(id=self.request.user.id).agree_privacy_policy:
+            resp = JsonResponse({
+                'code': 400,
+                'msg': 'The user has signed privacy policy agreement already.',
+                'access': access
+            })
+            return resp
+        User.objects.filter(id=self.request.user.id).update(agree_privacy_policy=True,
+                                                            agree_privacy_policy_time=now_time)
+        resp = JsonResponse({
+            'code': 201,
+            'msg': 'Updated',
+            'access': access
+        })
+        return resp
