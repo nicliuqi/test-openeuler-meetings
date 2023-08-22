@@ -22,6 +22,8 @@ def cancelMeeting(mid):
         status = zoom_apis.cancelMeeting(mid)
     elif mplatform == 'welink':
         status = welink_apis.cancelMeeting(mid, host_id)
+    elif mplatform == 'tencent':
+        status = tencent_apis.cancelMeeting(mid)
     return status
 
 
@@ -33,5 +35,7 @@ def getParticipants(mid):
         status, res = zoom_apis.getParticipants(mid)
     elif mplatform == 'welink':
         status, res = welink_apis.getParticipants(mid)
+    elif mplatform == 'tencent':
+        status, res = tencent_apis.getParticipants(mid)
     return status, res
 

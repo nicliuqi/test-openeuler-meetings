@@ -98,7 +98,9 @@ def createMeeting(date, start, end, topic, host_id, record):
         "end_time": end_time,
         "settings": {
             "mute_enable_join": True
-        }
+        },
+        "enable_host_key": True,
+        "host_key": str(settings.TENCENT_HOST_KEY)
     }
     if record == 'cloud':
         payload['settings']['auto_record_type'] = 'cloud'
