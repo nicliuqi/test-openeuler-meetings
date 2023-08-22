@@ -12,6 +12,7 @@ from meetings.models import Meeting, Video, Record
 from multiprocessing.dummy import Pool as ThreadPool
 from meetings.utils.html_template import cover_content
 from meetings.utils.welink_apis import getParticipants, listRecordings, downloadHWCloudRecording, getDetailDownloadUrl
+from meetings.utils.tencent_apis import get_records, get_video_download
 
 logger = logging.getLogger('log')
 
@@ -22,7 +23,9 @@ class Command(BaseCommand):
         past_meetings = Meeting.objects.filter(is_delete=0).filter(
             Q(date__gt=str(datetime.datetime.now() - datetime.timedelta(days=7))) &
             Q(date__lte=datetime.datetime.now().strftime('%Y-%m-%d')))
-        recent_mids = [x for x in meeting_ids if x in list(past_meetings.values_list('mid', flat=True))]
+        record_mids = Record.objects.filter(platform='obs').values_list('mid', flat=True)
+        recent_mids = [x for x in meeting_ids if x in list(past_meetings.values_list('mid', flat=True)) and x not in
+                       record_mids]
         logger.info('meeting_ids: {}'.format(list(meeting_ids)))
         logger.info('mids of past_meetings: {}'.format(list(past_meetings.values_list('mid', flat=True))))
         logger.info('recent_mids: {}'.format(recent_mids))
@@ -538,7 +541,47 @@ def handle_welink_recordings(mid):
 
 
 def handle_tencent_recordings(mid):
-    pass
+    # 参数准备
+    meeting = Meeting.objects.get(mid=mid)
+    mmid = meeting.mmid
+    date = meeting.date
+    start = meeting.start
+    start_time = ' '.join([date, start])
+    start_timestamp = int(datetime.datetime.timestamp(datetime.datetime.strptime(start_time, '%Y-%m-%d %H:%M')))
+    # 获取账户级会议录制列表
+    records = get_records()
+    if not records:
+        return
+    # 遍历录制列表，匹配录制文件
+    match_record = {}
+    for record in records:
+        if record.get('meeting_id') != mmid:
+            continue
+        if record.get('state') != 3:
+            continue
+        media_start_time = record.get('media_start_time')
+        if abs(media_start_time // 1000 - start_timestamp) > 1800:
+            continue
+        record_file = record.get('record_files')[0]
+        if record_file.get('record_size') < 1024 * 1024 * 10:
+            continue
+        if not match_record:
+            match_record['record_file_id'] = record_file.get('record_file_id')
+            match_record['record_size'] = record_file.get('record_size')
+            match_record['userid'] = record.get('userid')
+        else:
+            if record_file.get('record_size') > match_record.get('record_size'):
+                match_record['record_file_id'] = record_file.get('record_file_id')
+                match_record['record_size'] = record_file.get('record_size')
+                match_record['userid'] = record.get('userid')
+    if not match_record:
+        logger.info('Find no recordings about Tencent meeting which id is {}'.format(mid))
+        return
+    # 获取录像下载链接
+    download_url = get_video_download(match_record.get('record_file_id'), match_record.get('userid'))
+    if not download_url:
+        return
+
 
 
 def run(mid):

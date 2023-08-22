@@ -38,6 +38,34 @@ def get_signature(method, uri, body):
     return signature, headers
 
 
+def get_records():
+    """获取有效录像"""
+    uri = '/v1/corp/records'
+    url = get_url(uri)
+    end_time = int(time.time())
+    start_time = end_time - 3600 * 24 * 2
+    signature, headers = get_signature('GET', uri, "")
+    page = 1
+    records = []
+    while True:
+        params = {
+            'start_time': start_time,
+            'end_time': end_time,
+            'page_size': 20,
+            'page': page
+        }
+        r = requests.get(url, params=params, headers=headers)
+        if r.status_code != 200:
+            logger.error(r.json())
+            return []
+        if 'record_meetings' not in r.json().keys():
+            break
+        record_meetings = r.json().get('record_meetings')
+        records.extend(record_meetings)
+        page += 1
+    return records
+
+
 def get_video_download(record_file_id, userid):
     """获取录像下载地址"""
     uri = '/v1/addresses/{}?userid={}'.format(record_file_id, userid)
