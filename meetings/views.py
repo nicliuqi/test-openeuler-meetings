@@ -42,7 +42,7 @@ online = 2
 def refresh_access(user):
     refresh = RefreshToken.for_user(user)
     access = str(refresh.access_token)
-    User.objects.filter(id-user.id).update(signature=access)
+    User.objects.filter(id=user.id).update(signature=access)
     return access
 
 
