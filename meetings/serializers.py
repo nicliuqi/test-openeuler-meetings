@@ -266,14 +266,12 @@ class ActivitySerializer(ModelSerializer):
 
 class ActivitiesSerializer(ModelSerializer):
     collection_id = serializers.SerializerMethodField()
-    register_id = serializers.SerializerMethodField()
-    register_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Activity
-        fields = ['id', 'collection_id', 'register_id', 'title', 'date', 'activity_type', 'synopsis', 'live_address',
+        fields = ['id', 'collection_id', 'title', 'date', 'activity_type', 'synopsis', 'live_address',
                   'address', 'detail_address', 'longitude', 'latitude', 'schedules', 'poster', 'status', 'user',
-                  'enterprise', 'register_count', 'start', 'end', 'join_url', 'replay_url']
+                  'enterprise', 'start', 'end', 'join_url', 'replay_url', 'register_url']
 
     def get_collection_id(self, obj):
         user = None
@@ -285,27 +283,13 @@ class ActivitiesSerializer(ModelSerializer):
         except IndexError:
             return
 
-    def get_register_id(self, obj):
-        user = None
-        request = self.context.get("request")
-        if request and hasattr(request, "user"):
-            user = request.user
-        try:
-            return ActivityRegister.objects.filter(user_id=user.pk, activity_id=obj.id).values()[0]['id']
-        except IndexError:
-            return
-
-    def get_register_count(self, obj):
-        activity_id = obj.id
-        return len(ActivityRegister.objects.filter(activity_id=activity_id).values())
-
 
 class ActivityRetrieveSerializer(ActivitiesSerializer):
     class Meta:
         model = Activity
-        fields = ['id', 'collection_id', 'register_id', 'title', 'date', 'activity_type', 'synopsis', 'live_address',
+        fields = ['id', 'collection_id', 'title', 'date', 'activity_type', 'synopsis', 'live_address',
                   'address', 'detail_address', 'longitude', 'latitude', 'schedules', 'poster', 'status', 'user',
-                  'enterprise', 'register_count', 'wx_code', 'sign_url', 'start', 'end', 'join_url', 'replay_url']
+                  'enterprise', 'wx_code', 'start', 'end', 'join_url', 'replay_url', 'register_url']
 
 
 class ActivityUpdateSerializer(ModelSerializer):

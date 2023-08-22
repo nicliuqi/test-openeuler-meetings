@@ -543,6 +543,7 @@ def handle_welink_recordings(mid):
 def handle_tencent_recordings(mid):
     # 参数准备
     meeting = Meeting.objects.get(mid=mid)
+    video = Video.objects.get(mid=mid)
     mmid = meeting.mmid
     date = meeting.date
     start = meeting.start
@@ -577,10 +578,67 @@ def handle_tencent_recordings(mid):
     if not match_record:
         logger.info('Find no recordings about Tencent meeting which id is {}'.format(mid))
         return
+    total_size = match_record['record_size']
     # 获取录像下载链接
     download_url = get_video_download(match_record.get('record_file_id'), match_record.get('userid'))
     if not download_url:
         return
+    # 连接obs服务，实例化ObsClient
+    access_key_id = settings.DEFAULT_CONF.get('ACCESS_KEY_ID', '')
+    secret_access_key = settings.DEFAULT_CONF.get('SECRET_ACCESS_KEY', '')
+    endpoint = settings.DEFAULT_CONF.get('OBS_ENDPOINT', '')
+    bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME', '')
+    if not (access_key_id and secret_access_key and endpoint and bucketName):
+        logger.error('losing required arguments for ObsClient')
+        return
+    try:
+        obs_client = ObsClient(access_key_id=access_key_id,
+                               secret_access_key=secret_access_key,
+                               server='https://{}'.format(endpoint))
+        objs = []
+        mark = None
+        while True:
+            obs_objs = obs_client.listObjects(bucketName, marker=mark, max_keys=1000)
+            if obs_objs.status < 300:
+                index = 1
+                for content in obs_objs.body.contents:
+                    objs.append(content)
+                    index += 1
+                if obs_objs.body.is_truncated:
+                    mark = obs_objs.body.next_marker
+                else:
+                    break
+        # 预备文件上传路径
+        start = date + 'T' + start + ':00Z'
+        month = datetime.datetime.strptime(start.replace('T', ' ').replace('Z', ''),
+                                           "%Y-%m-%d %H:%M:%S").strftime("%b").lower()
+        group_name = video.group_name
+        video_name = mid + '.mp4'
+        object_key = 'openeuler/{}/{}/{}/{}'.format(group_name, month, mid, video_name)
+        logger.info('meeting {}: object_key is {}'.format(mid, object_key))
+        # 收集录像信息待用
+        end = date + 'T' + meeting.end + ':00Z'
+        if not objs:
+            logger.info('meeting {}: OBS无存储对象，开始下载视频'.format(mid))
+            download_upload_recordings(start, end, download_url, mid, total_size, video,
+                                       endpoint, object_key,
+                                       group_name, obs_client)
+        else:
+            key_size_map = {x['key']: x['size'] for x in objs}
+            if object_key not in key_size_map.keys():
+                logger.info('meeting {}: OBS存储服务中无此对象，开始下载视频'.format(mid))
+                download_upload_recordings(start, end, download_url, mid, total_size, video,
+                                           endpoint, object_key,
+                                           group_name, obs_client)
+            elif object_key in key_size_map.keys() and key_size_map[object_key] >= total_size:
+                logger.info('meeting {}: OBS存储服务中已存在该对象且无需替换'.format(mid))
+            else:
+                logger.info('meeting {}: OBS存储服务中该对象需要替换，开始下载视频'.format(mid))
+                download_upload_recordings(start, end, download_url, mid, total_size, video,
+                                           endpoint,
+                                           object_key, group_name, obs_client)
+    except Exception as e:
+        logger.error(e)
 
 
 

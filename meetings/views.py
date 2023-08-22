@@ -998,10 +998,6 @@ class ActivityUpdateView(GenericAPIView, UpdateModelMixin):
 
     @swagger_auto_schema(operation_summary='修改活动')
     def put(self, request, *args, **kwargs):
-        activity_id = self.kwargs.get('pk')
-        mid = Activity.objects.get(id=activity_id).mid
-        schedules = self.request.data['schedules']
-        invite.add_panelists(mid, schedules)
         return self.update(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
