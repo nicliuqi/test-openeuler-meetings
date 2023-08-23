@@ -102,6 +102,7 @@ def createMeeting(date, start, end, topic, host_id, record):
         "enable_host_key": True,
         "host_key": str(settings.TENCENT_HOST_KEY)
     }
+    print('payload: {}'.format(payload))
     if record == 'cloud':
         payload['settings']['auto_record_type'] = 'cloud'
         payload['settings']['participant_join_auto_record'] = True
@@ -110,6 +111,8 @@ def createMeeting(date, start, end, topic, host_id, record):
     url = get_url(uri)
     payload = json.dumps(payload)
     signature, headers = get_signature('POST', uri, payload)
+    print('signature: {}'.format(signature))
+    print('headers: {}'.format(headers))
     r = requests.post(url, headers=headers, data=payload)
     resp_dict = {
         'host_id': host_id
