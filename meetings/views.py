@@ -559,7 +559,7 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
         if status not in [200, 201]:
             return JsonResponse({'code': 400, 'msg': 'Bad Request', 'access': access})
         mid = content['mid']
-        start_url = content['start_url']
+        start_url = content.get('start_url')
         join_url = content['join_url']
         host_id = content['host_id']
         timezone = content['timezone'] if 'timezone' in content else 'Asia/Shanghai'
