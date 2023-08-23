@@ -111,11 +111,7 @@ def createMeeting(date, start, end, topic, host_id, record):
     url = get_url(uri)
     payload = json.dumps(payload)
     signature, headers = get_signature('POST', uri, payload)
-    print('signature: {}'.format(signature))
-    print('headers: {}'.format(headers))
     r = requests.post(url, headers=headers, data=payload)
-    print('response: {}'.format(r))
-    print('response status code: {}'.format(r.status_code))
     resp_dict = {
         'host_id': host_id
     }

@@ -9,7 +9,7 @@ def createMeeting(platform, date, start, end, topic, host, record):
     elif platform == 'welink':
         status, content = welink_apis.createMeeting(date, start, end, topic, host, record)
     elif platform == 'tencent':
-        stauts, content = tencent_apis.createMeeting(date, start, end, topic, host, record)
+        status, content = tencent_apis.createMeeting(date, start, end, topic, host, record)
     return status, content
 
 
