@@ -641,7 +641,6 @@ def handle_tencent_recordings(mid):
         logger.error(e)
 
 
-
 def run(mid):
     """
     查询Video根据total_size判断是否需要执行后续操作（下载、上传、保存数据）

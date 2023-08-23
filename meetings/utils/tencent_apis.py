@@ -102,7 +102,6 @@ def createMeeting(date, start, end, topic, host_id, record):
         "enable_host_key": True,
         "host_key": str(settings.TENCENT_HOST_KEY)
     }
-    print('payload: {}'.format(payload))
     if record == 'cloud':
         payload['settings']['auto_record_type'] = 'cloud'
         payload['settings']['participant_join_auto_record'] = True
