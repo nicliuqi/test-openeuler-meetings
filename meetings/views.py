@@ -556,8 +556,8 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
         logger.info('host:{}'.format(host))
 
         status, content = drivers.createMeeting(platform, date, start, end, topic, host, record)
-        print(status)
-        print(content)
+        print('status: {}'.format(status))
+        print('content: {}'.format(content))
         if status not in [200, 201]:
             return JsonResponse({'code': 400, 'msg': 'Bad Request', 'access': access})
         mid = content['mid']
