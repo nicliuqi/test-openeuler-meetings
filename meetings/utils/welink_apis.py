@@ -189,6 +189,7 @@ def getDetailDownloadUrl(confUUID, host_id):
 def downloadHWCloudRecording(token, target_filename, download_url):
     """下载云录制的视频"""
     if os.path.exists(target_filename):
-        subprocess.call('rm -f {}'.format(target_filename), shell=True)
-    subprocess.call('wget --header="Authorization: {}" -O {} {}'.format(token, target_filename, download_url), shell=True)
+        os.remove(target_filename)
+    cmd = 'wget --header="Authorization: {}" -O {} {}'.format(token, target_filename, download_url)
+    subprocess.call(cmd.split())
 

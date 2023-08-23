@@ -30,7 +30,7 @@ from rest_framework.response import Response
 from multiprocessing import Process
 from meetings.send_email import sendmail
 from rest_framework import permissions
-from meetings.utils import gene_wx_code, send_feedback, invite, send_start_url, drivers
+from meetings.utils import gene_wx_code, send_feedback, invite, drivers
 from rest_framework_simplejwt.tokens import RefreshToken
 from meetings.auth import CustomAuthentication
 
@@ -256,7 +256,8 @@ class MeetingsRecentlyView(GenericAPIView, ListModelMixin):
 
     @swagger_auto_schema(operation_summary='查询最近的会议')
     def get(self, request, *args, **kwargs):
-        self.queryset = self.queryset.filter(date__gte=datetime.datetime.now().strftime('%Y-%m-%d')).order_by('date','start')
+        self.queryset = self.queryset.filter(date__gte=datetime.datetime.now().strftime('%Y-%m-%d')).\
+            order_by('date', 'start')
         return self.list(request, *args, **kwargs)
 
 
@@ -285,12 +286,12 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
             resp = JsonResponse({'code': 404, 'msg': 'Not Found', 'access': access})
             resp.status_code = 404
             return resp
-        if not (Meeting.objects.filter(mid=mid, user_id=self.request.user.id) or User.objects.filter(id=self.request.user.id, level=3)):
+        if not (Meeting.objects.filter(mid=mid, user_id=self.request.user.id) or User.objects.filter(
+                id=self.request.user.id, level=3)):
             resp = JsonResponse({'code': 401, 'msg': 'Unauthorized', 'access': access})
             resp.status_code = 401
             return resp
 
-        mplatform = Meeting.objects.get(mid=mid).mplatform
         drivers.cancelMeeting(mid)
 
         # 会议作软删除
@@ -532,7 +533,8 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
         # 查询待创建的会议与现有的预定会议是否冲突
         unavailable_host_id = []
         available_host_id = []
-        meetings = Meeting.objects.filter(is_delete=0, date=date, end__gt=start_search, start__lt=end_search, mplatform=platform).values()
+        meetings = Meeting.objects.filter(is_delete=0, date=date, end__gt=start_search, start__lt=end_search,
+                                          mplatform=platform).values()
         try:
             for meeting in meetings:
                 host_id = meeting['host_id']
@@ -959,7 +961,8 @@ class RecentActivitiesView(GenericAPIView, ListModelMixin):
 
     @swagger_auto_schema(operation_summary='最近的活动列表')
     def get(self, request, *args, **kwargs):
-        self.queryset = self.queryset.filter(status__gt=2, date__gt=datetime.datetime.now().strftime('%Y-%m-%d')).order_by('-date', 'id')
+        self.queryset = self.queryset.filter(status__gt=2, date__gt=datetime.datetime.now().strftime('%Y-%m-%d')).\
+            order_by('-date', 'id')
         return self.list(request, *args, **kwargs)
 
 

@@ -49,14 +49,16 @@ def sendmail(mid):
     with open('templates/template_cancel_meeting.txt', 'r', encoding='utf-8') as fp:
         body = fp.read()
         body_of_email = body.replace('{{platform}}', platform). \
-                replace('{{start_time}}', start_time). \
-                replace('{{sig_name}}', sig_name)
+            replace('{{start_time}}', start_time). \
+            replace('{{sig_name}}', sig_name)
     content = MIMEText(body_of_email, 'plain', 'utf-8')
     msg.attach(content)
 
     # 取消日历
-    dt_start = (datetime.datetime.strptime(date + ' ' + start, '%Y-%m-%d %H:%M') - datetime.timedelta(hours=8)).replace(tzinfo=pytz.utc)
-    dt_end = (datetime.datetime.strptime(date + ' ' + end, '%Y-%m-%d %H:%M') - datetime.timedelta(hours=8)).replace(tzinfo=pytz.utc)
+    dt_start = (datetime.datetime.strptime(date + ' ' + start, '%Y-%m-%d %H:%M') - datetime.timedelta(hours=8)). \
+        replace(tzinfo=pytz.utc)
+    dt_end = (datetime.datetime.strptime(date + ' ' + end, '%Y-%m-%d %H:%M') - datetime.timedelta(hours=8)). \
+        replace(tzinfo=pytz.utc)
 
     cal = icalendar.Calendar()
     cal.add('prodid', '-//openeuler conference calendar')

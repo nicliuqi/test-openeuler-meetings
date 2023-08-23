@@ -59,9 +59,10 @@ def upload_to_obs(tmp_file, activity_id):
         sys.exit(1)
     obs_client = ObsClient(access_key_id=access_key_id,
                            secret_access_key=secret_access_key,
-                           server='https://{}'.format(endpoint))
+                           server='https://%s' % endpoint)
     object_key = 'openeuler/miniprogram/activity/{}/wx_code.jpeg'.format(activity_id)
-    obs_client.uploadFile(bucketName=bucketName, objectKey=object_key, uploadFile=tmp_file, taskNum=10, enableCheckpoint=True)
+    obs_client.uploadFile(bucketName=bucketName, objectKey=object_key, uploadFile=tmp_file, taskNum=10,
+                          enableCheckpoint=True)
     img_url = 'https://{}.{}/{}'.format(bucketName, endpoint, object_key)
     return img_url
 

@@ -29,7 +29,7 @@ class Command(BaseCommand):
             sys.exit(1)
         obs_client = ObsClient(access_key_id=access_key_id,
                                secret_access_key=secret_access_key,
-                               server='https://{}'.format(endpoint))
+                               server='https://%s' % endpoint)
         bili_mids = [int(x.mid) for x in Record.objects.filter(platform='bilibili', url__isnull=True)]
         logger.info('所有还未上传B站的会议的mid: {}'.format(bili_mids))
         all_bili_mids = [int(x.mid) for x in Record.objects.filter(platform='bilibili')]

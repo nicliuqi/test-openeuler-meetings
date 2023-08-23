@@ -25,7 +25,7 @@ class Command(BaseCommand):
             sys.exit(1)
         obs_client = ObsClient(access_key_id=access_key_id,
                                secret_access_key=secret_access_key,
-                               server='https://{}'.format(endpoint))
+                               server='https://%s' % endpoint)
         objs = []
         mark = None
         while True:
@@ -75,8 +75,8 @@ class Command(BaseCommand):
                             # 下载封面
                             img_object_key = object_key.replace('.mp4', '.png')
                             try:
-                                resp2 = obs_client.downloadFile(bucketName, img_object_key, imageFile, partSize, taskNum,
-                                                                enableCheckpoint)
+                                resp2 = obs_client.downloadFile(bucketName, img_object_key, imageFile, partSize,
+                                                                taskNum, enableCheckpoint)
                                 if resp2.status < 300:
                                     # 将下载的视频上传至B站
                                     topic = metadata_dict['meeting_topic']
