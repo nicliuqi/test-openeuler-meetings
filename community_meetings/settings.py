@@ -6,13 +6,14 @@ https://docs.djangoproject.com/en/2.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
+import base64
 import datetime
 import time
 import os
+import requests
 import sys
 import yaml
 from datetime import timedelta
-from meetings.utils.zoom_apis import getOauthToken
 
 
 CONFIG_PATH = os.getenv('CONFIG_PATH')
@@ -27,10 +28,27 @@ if sys.argv[0] == 'uwsgi':
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def getOauthToken(account_id, client_id, client_secret, zoom_auth_url):
+    url = zoom_auth_url
+    payload = {
+        'grant_type': 'account_credentials',
+        'account_id': account_id
+    }
+    headers = {
+        'Host': 'zoom.us',
+        'Authorization': 'Basic {}'.format(base64.b64encode((client_id + ':' + client_secret).encode()).decode())
+    }
+    r = requests.post(url, data=payload, headers=headers)
+    if r.status_code != 200:
+        return None
+    return r.json().get('access_token')
+
 account_id = DEFAULT_CONF.get('ZOOM_ACCOUNT_ID', '')
 client_id = DEFAULT_CONF.get('ZOOM_CLIENT_ID', '')
 client_secret = DEFAULT_CONF.get('ZOOM_CLIENT_SECRET', '')
-ZOOM_TOKEN = getOauthToken(account_id, client_id, client_secret)
+zoom_auth_url = DEFAULT_CONF.get('ZOOM_AUTH_URL')
+ZOOM_TOKEN = getOauthToken(account_id, client_id, client_secret, zoom_auth_url)
 
 CI_BOT_TOKEN = DEFAULT_CONF.get('CI_BOT_TOKEN')
 
