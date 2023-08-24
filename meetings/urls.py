@@ -8,7 +8,7 @@ from meetings.views import LoginView, GroupView, GroupsView, MeetingView, Meetin
     ActivityUpdateView, ActivityDraftView, ActivitiesDraftView, SponsorActivityDraftView, DraftUpdateView, \
     DraftPublishView, SponsorActivitiesPublishingView, ActivityCollectView, ActivityCollectDelView, \
     MyActivityCollectionsView, FeedbackView, CountActivitiesView, MyCountsView, MeetingsRecentlyView, \
-    ActivitiesDataView, AgreePrivacyPolicyView
+    ActivitiesDataView, AgreePrivacyPolicyView, AuthView
 
 urlpatterns = [
     path('login/', LoginView.as_view()),  # 登陆
@@ -66,4 +66,5 @@ urlpatterns = [
     path('mycounts/', MyCountsView.as_view()),  # 我的各类计数
     path('activitiesdata/', ActivitiesDataView.as_view()),  # 活动日历
     path('agree/', AgreePrivacyPolicyView.as_view()),  # 同意更新隐私政策
+    path('auth/', AuthView.as_view()),  # zoom auth
 ]

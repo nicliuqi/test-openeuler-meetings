@@ -1550,3 +1550,9 @@ class AgreePrivacyPolicyView(GenericAPIView, UpdateModelMixin):
             'access': access
         })
         return resp
+
+
+class AuthView(GenericAPIView):
+    def get(self, request, *args, **kwargs):
+        return JsonResponse({'code': 200, 'msg': 'OK'})
+

@@ -4,6 +4,7 @@ import json
 import random
 import requests
 from django.conf import settings
+from meetings.models import Zoom
 
 logger = logging.getLogger('log')
 
@@ -65,3 +66,8 @@ def getParticipants(mid):
         return r.status_code, resp
     else:
         return r.status_code, r.json()
+
+
+def getOauthToken():
+    token = Zoom.objects.get(id=1).access
+    return token
