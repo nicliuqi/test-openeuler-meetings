@@ -17,9 +17,10 @@ def createMeeting(date, start, end, topic, host, record):
     duration = int((datetime.datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%SZ') -
                     datetime.datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%SZ')).seconds / 60)
     password = str(random.randint(100000, 999999))
+    token = getOauthToken()
     headers = {
         "content-type": "application/json",
-        "authorization": "Bearer {}".format(settings.ZOOM_TOKEN)
+        "authorization": "Bearer {}".format(token)
     }
     payload = {
         'start_time': start_time,
@@ -47,8 +48,9 @@ def createMeeting(date, start, end, topic, host, record):
 
 def cancelMeeting(mid):
     url = "https://api.zoom.us/v2/meetings/{}".format(mid)
+    token = getOauthToken()
     headers = {
-        "authorization": "Bearer {}".format(settings.ZOOM_TOKEN)
+        "authorization": "Bearer {}".format(token)
     }
     response = requests.request("DELETE", url, headers=headers)
     return response.status_code
@@ -56,8 +58,9 @@ def cancelMeeting(mid):
 
 def getParticipants(mid):
     url = "https://api.zoom.us/v2/past_meetings/{}/participants?page_size=300".format(mid)
+    token = getOauthToken()
     headers = {
-        "authorization": "Bearer {}".format(settings.ZOOM_TOKEN)}
+        "authorization": "Bearer {}".format(token)}
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         total_records = r.json()['total_records']

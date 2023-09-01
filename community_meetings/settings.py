@@ -14,7 +14,6 @@ import requests
 import sys
 import yaml
 from datetime import timedelta
-from meetings.utils.zoom_apis import getOauthToken
 
 
 CONFIG_PATH = os.getenv('CONFIG_PATH')
@@ -28,8 +27,6 @@ if sys.argv[0] == 'uwsgi':
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-ZOOM_TOKEN = getOauthToken()
 
 CI_BOT_TOKEN = DEFAULT_CONF.get('CI_BOT_TOKEN')
 

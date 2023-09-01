@@ -3,6 +3,7 @@ import json
 import requests
 from django.conf import settings
 from meetings.models import Activity
+from meetings.utils.zoom_apis import getOauthToken
 
 
 logger = logging.getLogger('log')
@@ -44,7 +45,7 @@ def add_panelists(mid, new_schedules):
 
 
 def post(data, mid):
-    access_token = settings.ZOOM_TOKEN
+    access_token = getOauthToken()
     url = 'https://api.zoom.us/v2/webinars/{}/panelists'.format(mid)
     headers = {
         'Content-Type': 'application/json',

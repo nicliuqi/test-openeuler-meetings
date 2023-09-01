@@ -13,6 +13,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 from meetings.utils.html_template import cover_content
 from meetings.utils.welink_apis import getParticipants, listRecordings, downloadHWCloudRecording, getDetailDownloadUrl
 from meetings.utils.tencent_apis import get_records, get_video_download
+from meetings.utils.zoom_apis import getOauthToken
 
 logger = logging.getLogger('log')
 
@@ -44,8 +45,9 @@ def get_recordings(mid):
     """
     host_id = Meeting.objects.get(mid=mid).host_id
     url = 'https://api.zoom.us/v2/users/{}/recordings'.format(host_id)
+    token = getOauthToken()
     headers = {
-        'authorization': 'Bearer {}'.format(settings.ZOOM_TOKEN)
+        'authorization': 'Bearer {}'.format(token)
     }
     params = {
         'from': (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d"),
@@ -76,8 +78,9 @@ def get_participants(mid):
     :return: the json-encoded content of a response or none
     """
     url = 'https://api.zoom.us/v2/past_meetings/{}/participants?page_size=300'.format(mid)
+    token = getOauthToken()
     headers = {
-        'authorization': 'Bearer {}'.format(settings.ZOOM_TOKEN)
+        'authorization': 'Bearer {}'.format(token)
     }
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
