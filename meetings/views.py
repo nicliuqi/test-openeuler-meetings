@@ -1554,5 +1554,8 @@ class AgreePrivacyPolicyView(GenericAPIView, UpdateModelMixin):
 
 class AuthView(GenericAPIView):
     def get(self, request, *args, **kwargs):
+        ip = self.request.headers.get('X-Original-Forwarded-For').split(',')[0]
+        user_agent = self.request.headers.get('User-Agent')
+        logger.info('ip: {}, user_agent: {}'.format(ip, user_agent))
         return JsonResponse({'code': 200, 'msg': 'OK'})
 
