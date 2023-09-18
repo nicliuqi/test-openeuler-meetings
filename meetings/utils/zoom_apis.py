@@ -4,7 +4,7 @@ import json
 import random
 import requests
 from django.conf import settings
-from meetings.models import Zoom
+from obs import ObsClient
 
 logger = logging.getLogger('log')
 
@@ -72,5 +72,19 @@ def getParticipants(mid):
 
 
 def getOauthToken():
-    token = Zoom.objects.get(id=1).access
+    access_key_id = settings.DEFAULT_CONF.get('ACCESS_KEY_ID_2')
+    secret_access_key = settings.DEFAULT_CONF.get('SECRET_ACCESS_KEY_2')
+    endpoint = settings.DEFAULT_CONF.get('OBS_ENDPOINT_2')
+    bucketName = settings.DEFAULT_CONF.get('OBS_BUCKETNAME_2')
+    object_key = settings.DEFAULT_CONF.get('ZOOM_TOKEN_OBJECT')
+    obs_client = ObsClient(access_key_id=access_key_id, secret_access_key=secret_access_key, server=endpoint)
+    res = obs_client.getObjectMetadata(bucketName, object_key)
+    token = ''
+    if res.get('status') != 200:
+        logger.error('Fail to get zoom token')
+        return token
+    for k, v in res.get('header'):
+        if k == 'access_token':
+            token = v
+            break
     return token

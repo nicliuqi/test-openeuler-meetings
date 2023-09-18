@@ -9,7 +9,6 @@ import sys
 from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse
-from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import GenericAPIView
@@ -51,7 +50,6 @@ class LoginView(GenericAPIView, CreateModelMixin, ListModelMixin):
     serializer_class = LoginSerializer
     queryset = User.objects.all()
 
-    @swagger_auto_schema(operation_summary='用户注册与授权登陆')
     def post(self, request, *args, **kwargs):
         return self.create(request, *args, **kwargs)
 
@@ -66,7 +64,6 @@ class GroupsView(GenericAPIView, ListModelMixin):
     filter_backends = [SearchFilter]
     search_fields = ['group_name']
 
-    @swagger_auto_schema(operation_summary='查询所有SIG组')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -85,7 +82,6 @@ class GroupView(GenericAPIView, RetrieveModelMixin):
     serializer_class = GroupSerializer
     queryset = Group.objects.all()
 
-    @swagger_auto_schema(operation_summary='查询单个SIG组')
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -99,7 +95,6 @@ class UsersIncludeView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (AdminPermission,)
 
-    @swagger_auto_schema(operation_summary='查询所选SIG组的所有成员')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -122,7 +117,6 @@ class UsersExcludeView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (AdminPermission,)
 
-    @swagger_auto_schema(operation_summary='查询不在该组的所有用户')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -141,7 +135,6 @@ class UserGroupView(GenericAPIView, ListModelMixin):
     serializer_class = UserGroupSerializer
     queryset = GroupUser.objects.all()
 
-    @swagger_auto_schema(operation_summary='查询该用户的SIG组以及该组的etherpad')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -160,7 +153,6 @@ class UserView(GenericAPIView, UpdateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (AdminPermission,)
 
-    @swagger_auto_schema(operation_summary='更新用户gitee_name')
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
@@ -188,7 +180,6 @@ class GroupUserAddView(GenericAPIView, CreateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (AdminPermission,)
 
-    @swagger_auto_schema(operation_summary='SIG组批量新增成员')
     def post(self, request, *args, **kwargs):
         return self.create(request, *args, **kwargs)
 
@@ -230,7 +221,6 @@ class MeetingsWeeklyView(GenericAPIView, ListModelMixin):
     filter_backends = [SearchFilter]
     search_fields = ['topic', 'group_name']
 
-    @swagger_auto_schema(operation_summary='查询前后一周的所有会议')
     def get(self, request, *args, **kwargs):
         self.queryset = self.queryset.filter((Q(
             date__gte=str(datetime.datetime.now() - datetime.timedelta(days=7))[:10]) & Q(
@@ -243,7 +233,6 @@ class MeetingsDailyView(GenericAPIView, ListModelMixin):
     serializer_class = MeetingListSerializer
     queryset = Meeting.objects.filter(is_delete=0)
 
-    @swagger_auto_schema(operation_summary='查询本日的所有会议')
     def get(self, request, *args, **kwargs):
         self.queryset = self.queryset.filter(date=str(datetime.datetime.now())[:10]).order_by('start')
         return self.list(request, *args, **kwargs)
@@ -254,7 +243,6 @@ class MeetingsRecentlyView(GenericAPIView, ListModelMixin):
     serializer_class = MeetingListSerializer
     queryset = Meeting.objects.filter(is_delete=0)
 
-    @swagger_auto_schema(operation_summary='查询最近的会议')
     def get(self, request, *args, **kwargs):
         self.queryset = self.queryset.filter(date__gte=datetime.datetime.now().strftime('%Y-%m-%d')).\
             order_by('date', 'start')
@@ -266,7 +254,6 @@ class MeetingView(GenericAPIView, RetrieveModelMixin):
     serializer_class = MeetingListSerializer
     queryset = Meeting.objects.filter(is_delete=0)
 
-    @swagger_auto_schema(operation_summary='查询会议')
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -278,7 +265,6 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (MaintainerPermission,)
 
-    @swagger_auto_schema(operation_summary='删除会议')
     def delete(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         mid = kwargs.get('mid')
@@ -492,7 +478,6 @@ class MeetingsView(GenericAPIView, CreateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (MaintainerPermission,)
 
-    @swagger_auto_schema(operation_summary='创建会议')
     def post(self, request, *args, **kwargs):
         t1 = time.time()
         access = refresh_access(self.request.user)
@@ -634,7 +619,6 @@ class MyMeetingsView(GenericAPIView, ListModelMixin):
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (authentication.JWTAuthentication,)
 
-    @swagger_auto_schema(operation_summary='查询我创建的所有会议')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -747,7 +731,6 @@ class SponsorsView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='活动发起人列表')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -761,7 +744,6 @@ class NonSponsorView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='非活动发起人列表')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -772,7 +754,6 @@ class SponsorAddView(GenericAPIView, CreateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='批量添加活动发起人')
     def post(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         ids = self.request.data.get('ids')
@@ -787,7 +768,6 @@ class SponsorDelView(GenericAPIView, CreateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='批量删除活动发起人')
     def post(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         ids = self.request.data.get('ids')
@@ -803,7 +783,6 @@ class SponsorInfoView(GenericAPIView, UpdateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='修改活动发起人信息')
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
@@ -831,7 +810,6 @@ class DraftsView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='审核列表')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -843,7 +821,6 @@ class DraftView(GenericAPIView, RetrieveModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='待发布详情')
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -855,7 +832,6 @@ class ActivityView(GenericAPIView, CreateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='创建活动并申请发布')
     def post(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         data = self.request.data
@@ -919,7 +895,6 @@ class ActivitiesView(GenericAPIView, ListModelMixin):
     filter_backends = [SearchFilter]
     search_fields = ['title', 'enterprise']
 
-    @swagger_auto_schema(operation_summary='活动列表')
     def get(self, request, *args, **kwargs):
         activity_status = self.request.GET.get('activity')
         activity_type = self.request.GET.get('activity_type')
@@ -959,7 +934,6 @@ class RecentActivitiesView(GenericAPIView, ListModelMixin):
     filter_backends = [SearchFilter]
     search_fields = ['enterprise']
 
-    @swagger_auto_schema(operation_summary='最近的活动列表')
     def get(self, request, *args, **kwargs):
         self.queryset = self.queryset.filter(status__gt=2, date__gt=datetime.datetime.now().strftime('%Y-%m-%d')).\
             order_by('-date', 'id')
@@ -973,7 +947,6 @@ class SponsorActivitiesView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='我(活动发起人)的活动列表')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -987,7 +960,6 @@ class ActivityRetrieveView(GenericAPIView, RetrieveModelMixin):
     serializer_class = ActivityRetrieveSerializer
     queryset = Activity.objects.filter(is_delete=0, status__gt=2)
 
-    @swagger_auto_schema(operation_summary='查询一个活动')
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
@@ -999,7 +971,6 @@ class ActivityUpdateView(GenericAPIView, UpdateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='修改活动')
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
@@ -1034,7 +1005,6 @@ class ActivityPublishView(GenericAPIView, UpdateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='活动过审')
     def put(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
@@ -1057,7 +1027,6 @@ class ActivityRejectView(GenericAPIView, UpdateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='驳回申请')
     def put(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
@@ -1074,7 +1043,6 @@ class ActivityDelView(GenericAPIView, UpdateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (ActivityAdminPermission,)
 
-    @swagger_auto_schema(operation_summary='删除活动')
     def put(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
@@ -1089,7 +1057,6 @@ class ActivityDraftView(GenericAPIView, CreateModelMixin):
     authentication_classes = (CustomAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='创建活动草案')
     def post(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         data = self.request.data
@@ -1151,7 +1118,6 @@ class ActivitiesDraftView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='我(活动发起人)的活动草案列表')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -1167,11 +1133,9 @@ class SponsorActivityDraftView(GenericAPIView, RetrieveModelMixin, DestroyModelM
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='查询一个活动草案')
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-    @swagger_auto_schema(operation_summary='删除活动草案')
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
 
@@ -1301,7 +1265,6 @@ class SponsorActivitiesPublishingView(GenericAPIView, ListModelMixin):
     authentication_classes = (authentication.JWTAuthentication,)
     permission_classes = (SponsorPermission,)
 
-    @swagger_auto_schema(operation_summary='发布中(个人)的活动')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -1317,7 +1280,6 @@ class ActivityCollectView(GenericAPIView, CreateModelMixin):
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (CustomAuthentication,)
 
-    @swagger_auto_schema(operation_summary='收藏活动')
     def post(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         user_id = self.request.user.id
@@ -1333,7 +1295,6 @@ class ActivityCollectDelView(GenericAPIView, DestroyModelMixin):
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (CustomAuthentication,)
 
-    @swagger_auto_schema(operation_summary='取消收藏活动')
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
 
@@ -1358,7 +1319,6 @@ class MyActivityCollectionsView(GenericAPIView, ListModelMixin):
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (authentication.JWTAuthentication,)
 
-    @swagger_auto_schema(operation_summary='我收藏的活动')
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
@@ -1376,7 +1336,6 @@ class FeedbackView(GenericAPIView, CreateModelMixin):
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (CustomAuthentication,)
 
-    @swagger_auto_schema(operation_summary='意见反馈')
     def post(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         data = self.request.data
@@ -1411,7 +1370,6 @@ class CountActivitiesView(GenericAPIView, ListModelMixin):
     filter_backends = [SearchFilter]
     search_fields = ['title', 'enterprise']
 
-    @swagger_auto_schema(operation_summary='各类活动计数')
     def get(self, request, *args, **kwargs):
         search = self.request.GET.get('search')
         activity_type = self.request.GET.get('activity_type')
@@ -1448,7 +1406,6 @@ class MyCountsView(GenericAPIView, ListModelMixin):
     permission_classes = (permissions.IsAuthenticated,)
     authentication_classes = (authentication.JWTAuthentication,)
 
-    @swagger_auto_schema(operation_summary='我的各类计数')
     def get(self, request, *args, **kwargs):
         user_id = self.request.user.id
         user = User.objects.get(id=user_id)

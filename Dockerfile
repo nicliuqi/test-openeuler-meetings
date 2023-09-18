@@ -18,6 +18,14 @@ RUN wget https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkh
 
 RUN cp /usr/bin/python3 /usr/bin/python
 ENV LANG=en_US.UTF-8
+ARG user=meetingserver
+ARG group=meetingserver
+ARG uid=1000
+ARG gid=1000
+RUN groupadd -g ${gid} ${group}
+RUN useradd -u ${uid} -g ${group} -s /bin/sh -m ${user}
+RUN chown -R ${user}:${group} /work/app-meeting-server
+USER ${uid}:${gid}
 
 EXPOSE 8080
 ENTRYPOINT ["uwsgi", "--ini", "/work/app-meeting-server/deploy/production/uwsgi.ini"]
