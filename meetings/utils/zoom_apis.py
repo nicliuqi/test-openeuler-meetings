@@ -87,4 +87,5 @@ def getOauthToken():
         if k == 'access_token':
             token = v
             break
+    logger.info('Get zoom token successfully')
     return token

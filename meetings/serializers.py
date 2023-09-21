@@ -1,12 +1,11 @@
-import requests
 import logging
-from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from meetings.models import Collect, Group, User, Meeting, GroupUser, Record, Activity, ActivityCollect, \
     ActivityRegister, Feedback, ActivitySign
+from meetings.utils import wx_apis
 
 logger = logging.getLogger('log')
 
@@ -136,16 +135,8 @@ class LoginSerializer(serializers.ModelSerializer):
             if not code:
                 logger.warning('Login without jscode.')
                 raise serializers.ValidationError('需要code', code='code_error')
-            r = requests.get(
-                url='https://api.weixin.qq.com/sns/jscode2session?',
-                params={
-                    'appid': settings.APP_CONF['appid'],
-                    'secret': settings.APP_CONF['secret'],
-                    'js_code': code,
-                    'grant_type': 'authorization_code'
-                }
-            ).json()
-            if 'openid' not in r:
+            r = wx_apis.get_openid(code)
+            if not r.get('openid'):
                 logger.warning('Failed to get openid.')
                 raise serializers.ValidationError('未获取到openid', code='code_error')
             openid = r['openid']

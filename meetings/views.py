@@ -2,10 +2,8 @@ import datetime
 import json
 import random
 import re
-import requests
 import logging
 import time
-import sys
 from django.conf import settings
 from django.db.models import Q
 from django.http import JsonResponse
@@ -29,7 +27,7 @@ from rest_framework.response import Response
 from multiprocessing import Process
 from meetings.send_email import sendmail
 from rest_framework import permissions
-from meetings.utils import gene_wx_code, send_feedback, invite, drivers
+from meetings.utils import gene_wx_code, send_feedback, drivers, wx_apis
 from rest_framework_simplejwt.tokens import RefreshToken
 from meetings.auth import CustomAuthentication
 
@@ -294,7 +292,7 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
         # 发送会议取消通知
         collections = Collect.objects.filter(meeting_id=meeting_id)
         if collections:
-            access_token = self.get_token()
+            access_token = wx_apis.get_token()
             topic = meeting.topic
             date = meeting.date
             start_time = meeting.start
@@ -304,10 +302,8 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
                 user = User.objects.get(id=user_id)
                 nickname = user.nickname
                 openid = user.openid
-                content = self.get_remove_template(openid, topic, time, mid)
-                r = requests.post(
-                    'https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token={}'.format(access_token),
-                    data=json.dumps(content))
+                content = wx_apis.get_remove_template(openid, topic, time, mid)
+                r = wx_apis.send_subscription(content, access_token)
                 if r.status_code != 200:
                     logger.error('status code: {}'.format(r.status_code))
                     logger.error('content: {}'.format(r.json()))
@@ -321,46 +317,6 @@ class MeetingDelView(GenericAPIView, DestroyModelMixin):
                 # 删除收藏
                 collection.delete()
         return JsonResponse({"code": 204, "message": "Delete successfully.", "access": access})
-
-    def get_remove_template(self, openid, topic, time, mid):
-        if len(topic) > 20:
-            topic = topic[:20]
-        content = {
-            "touser": openid,
-            "template_id": "UpxRbZf8Z9QiEPlZeRCgp_MKvvqHlo6tcToY8fToK50",
-            "page": "/pages/index/index",
-            "miniprogram_state": "developer",
-            "lang": "zh-CN",
-            "data": {
-                "thing1": {
-                    "value": topic
-                },
-                "time2": {
-                    "value": time
-                },
-                "thing4": {
-                    "value": "会议{}已被取消".format(mid)
-                }
-            }
-        }
-        return content
-
-    def get_token(self):
-        appid = settings.APP_CONF['appid']
-        secret = settings.APP_CONF['secret']
-        url = 'https://api.weixin.qq.com/cgi-bin/token?appid={}&secret={}&grant_type=client_credential'.format(appid,
-                                                                                                               secret)
-        r = requests.get(url)
-        if r.status_code == 200:
-            try:
-                access_token = r.json()['access_token']
-                return access_token
-            except KeyError as e:
-                logger.error(e)
-        else:
-            logger.error(r.json())
-            logger.error('fail to get access_token,exit.')
-            sys.exit(1)
 
 
 class UserInfoView(GenericAPIView, RetrieveModelMixin):
@@ -1008,11 +964,9 @@ class ActivityPublishView(GenericAPIView, UpdateModelMixin):
     def put(self, request, *args, **kwargs):
         access = refresh_access(self.request.user)
         activity_id = self.kwargs.get('pk')
-        appid = settings.APP_CONF['appid']
-        secret = settings.APP_CONF['secret']
         if activity_id in self.queryset.values_list('id', flat=True):
             logger.info('活动id: {}'.format(activity_id))
-            img_url = gene_wx_code.run(appid, secret, activity_id)
+            img_url = gene_wx_code.run(activity_id)
             logger.info('生成活动页面二维码: {}'.format(img_url))
             Activity.objects.filter(id=activity_id, status=2).update(status=3, wx_code=img_url)
             logger.info('活动通过审核')
